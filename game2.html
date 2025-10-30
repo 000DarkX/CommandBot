@@ -217,8 +217,6 @@
       }
     }
 
-    addEventListener("load", populateLevels.bind(this, mjsModule.levels));
-
     function newCommand(type="Say") {
         const def = currentLevel.schema[type];
         const cmd = { id: crypto.randomUUID(), command: type, args: {} };
@@ -466,8 +464,15 @@
         }
     }
 
+    function pageLoad() {
+        populateLevels(mjsModule.levels)
+        refreshScriptList();
+    }
+
     // Call once on page load
-    refreshScriptList();
+    (()=> {
+        pageLoad();
+    })();
   </script>
 </body>
 </html>
