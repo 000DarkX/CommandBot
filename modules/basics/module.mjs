@@ -26,17 +26,59 @@ const schema = {
                     exec.call(this, cmd.workspace);
                 }
             },
+            "Attack": {
+                args:  {}, 
+                subWorkspace: false,
+                action: async function (cmd, unit, state) {
+                    let startX = unit.x;
+                    let startY = unit.y;
+                    if (unit.dir===0 && unit.y>0) startY--;
+                    if (unit.dir===1 && unit.x + 1 < this.map.width) startX++;
+                    if (unit.dir===2 && unit.y + 1 < this.map.height) startY++;
+                    if (unit.dir===3 && unit.x>0) startX--;
+                    await sleep(333);
+                    let gobject = undefined;
+                    
+                    for (const object of this.map.objects) {
+                        if (object.x == startX && object.y == startY && object.attacked) {
+                            object.attacked.call(this, object, unit, state);
+                            gobject = object;
+                            break;
+                        }
+                    }
+                    drawGrid();
+                    log(`Attack: ${gobject.name}`);
+                }
+            },
             "Walk": { 
                 args: { steps: { type: "number", default: 1 } }, 
                 subWorkspace: false,
                 action: async function (cmd, unit, state) {
                     let steps = parseInt(cmd.args.steps) || 0;
                     for (let i=0; i<steps; i++) {
+                        const startX = unit.x;
+                        const startY = unit.y;
                         if (unit.dir===0 && unit.y>0) unit.y--;
                         if (unit.dir===1 && unit.x + 1 < this.map.width) unit.x++;
                         if (unit.dir===2 && unit.y + 1 < this.map.height) unit.y++;
                         if (unit.dir===3 && unit.x>0) unit.x--;
+                        for (const object of this.map.objects) {
+                            if (object.dead) continue;
+                            if (object.x == unit.x && object.y == unit.y && object.solid) {
+                                unit.x = startX;
+                                unit.y = startY;
+                                log("Cannot move there!");
+                            }
+                        }
                         await sleep(333);
+                        if (i + 1 < steps) {
+                            for (const object of this.map.objects) {
+                                if (object && object.tick) {
+                                    object.tick.call(this, unit, state);
+                                }
+                            }
+                        }
+                        
                         drawGrid();
                     }
                     log("Walk " + steps + " step(s)");
@@ -114,6 +156,65 @@ export const levels = {
                     end: function (unit, state) {
                         if (unit.x == 6 && unit.y == 1) {
                             alert("You exited the level!");
+                            loadLevel("level3");
+                        }
+                    }
+                }
+            ]
+        },
+        schema
+    },
+    level3: {
+        name: "Level Three",
+        desc: "Get to the exit!",
+        map: {
+            width: 7,
+            height: 2,
+            objects: [
+                {
+                    title: "exit",
+                    x: 6,
+                    y: 1,
+                    char: "❌",
+                    end: function (unit, state) {
+                        if (unit.x == 6 && unit.y == 1) {
+                            alert("You exited the level!");
+                        }
+                    }
+                },
+                {
+                    id: "enemyA",
+                    title: function (self) {
+                        return `enemy A - Life ${self.life}, Attack ${self.atk}, Range ${self.range}`;
+                    },
+                    name: "Enemy A",
+                    x: 6,
+                    y: 0,
+                    char: "👿",
+                    solid: true,
+                    life: 2,
+                    atk: 1,
+                    range: 1,
+                    dead: false,
+                    attacked: function(self, unit, state) {
+                        self.life -= unit.attack;
+                        if (self.life <= 0) {
+                            self.dead = true;
+                        }
+                    },
+                    tick: function (self, unit, state) {
+                        if (self.dead) {
+                            return;
+                        }
+                        const r = Math.hypot(unit.x - self.x, unit.y - self.y);
+                        if (r <= 1) {
+                            unit.life -= 1;
+                            log(`Enemy A: attacks, Your life: ${unit.life}`);
+                            if (unit.life <= 0) {
+                                resetLevel();
+                            }
+                        } else {
+                            log("Enemy A: Looks around");
                         }
                     }
                 }
@@ -122,4 +223,3 @@ export const levels = {
         schema
     }
 }
-
