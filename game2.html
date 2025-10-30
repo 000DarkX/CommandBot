@@ -116,6 +116,107 @@
     .btn-danger { background: #e74c3c; color: #fff; }
     .btn-secondary { background: #2ecc71; color: #fff; }
   </style>
+  <style>
+     .workspace {
+      display: flex;
+      flex-direction: row;
+      gap: 1.5rem;
+      padding: 1rem 2rem;
+      height: calc(100vh - 140px); /* header + footer */
+      overflow: hidden;
+    }
+
+    #editorPane {
+      flex: 2;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    #sidePane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      overflow-y: auto;
+    }
+    .command {
+      background: #2c2f45;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: box-shadow 0.2s ease;
+    }
+
+    .command:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+    }
+
+    .command select:first-child {
+      font-weight: bold;
+      background: #444;
+      color: #fff;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 1rem;
+    }
+
+    .command label {
+      font-size: 0.9rem;
+      color: #ccc;
+    }
+
+    .command input, .command select {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: none;
+      background: #3a3a55;
+      color: #eee;
+      font-size: 0.95rem;
+    }
+
+    .subworkspace {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 10px;
+      padding-left: 16px;
+      border-left: 4px solid #61dafb;
+    }
+
+    .subworkspace .command {
+      background: #35354f;
+    }
+
+    /*#grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(30px, 1fr));
+      gap: 2px;
+      background: #1e1e2f;
+      padding: 10px;
+      border-radius: 8px;
+    }*/
+
+    .cell {
+      background: #333;
+      color: white;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+
+    .unit {
+      background: #61dafb;
+      color: #000;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
   <header>
@@ -273,7 +374,7 @@
         // Args
         for (let arg in def.args) {
             const argDef = def.args[arg];
-            let type = argDef.type || argDef; // fallback for old schema
+            let type = argDef.type || argDef;
             let input;
 
             if (Array.isArray(type)) {
@@ -291,9 +392,14 @@
             }
 
             input.oninput = () => { cmd.args[arg] = input.value; };
-            div.appendChild(document.createTextNode(arg + ": "));
-            div.appendChild(input);
+
+            const label = document.createElement("label");
+            label.textContent = arg + ": ";
+            label.appendChild(input);
+            div.appendChild(label);
         }
+
+
 
         // Sub-workspace
         if (def.subWorkspace) {
@@ -303,18 +409,18 @@
           details.appendChild(summary);
 
           const subDiv = document.createElement("div");
-          subDiv.className = "workspace";
+          subDiv.className = "subworkspace";
           renderWorkspace(subDiv, cmd.workspace);
           details.appendChild(subDiv);
 
-          const addBtn = document.createElement("button");
+          /* const addBtn = document.createElement("button");
           addBtn.className = "btn-secondary";
           addBtn.textContent = "Add Sub-Command";
           addBtn.onclick = () => {
             cmd.workspace.push(newCommand());
             renderWorkspace(container, workspace);
           };
-          details.appendChild(addBtn);
+          details.appendChild(addBtn);*/
 
           details.open = true;
           div.appendChild(details);
