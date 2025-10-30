@@ -36,7 +36,7 @@ const schema = {
                         if (unit.dir===1 && unit.x + 1 < this.map.width) unit.x++;
                         if (unit.dir===2 && unit.y + 1 < this.map.height) unit.y++;
                         if (unit.dir===3 && unit.x>0) unit.x--;
-                        sleep(333);
+                        await sleep(333);
                         drawGrid();
                     }
                     log("Walk " + steps + " step(s)");
@@ -122,3 +122,4 @@ export const levels = {
         schema
     }
 }
+
