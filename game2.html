@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Command Bot</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", sans-serif;
+      background: #f4f6f9;
+      color: #333;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #2c3e50;
+      color: #fff;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .workspace {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 70% 30%;
+      gap: 1rem;
+      padding: 1rem 2rem;
+      overflow: hidden;
+    }
+
+    #editorPane, #sidePane {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #editor {
+      flex: 1;
+      background: #1e1e2f;
+      color: #eee;
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-y: auto;
+      font-size: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    #output, #desc, #grid, #log {
+      background: #fafafa;
+      border-radius: 6px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      overflow-y: auto;
+    }
+
+    #output {
+      background: #111;
+      color: #61dafb;
+      max-height: 200px;
+    }
+
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(10, 30px);
+      grid-template-rows: repeat(10, 30px);
+      gap: 2px;
+    }
+
+    .cell {
+      width: 30px; height: 30px;
+      cursor: pointer;
+      background: #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 18px;
+    }
+    .unit { background: #61dafb; color: #000; border-radius: 4px; }
+
+    footer {
+      background: #fff;
+      padding: 0.8rem 2rem;
+      display: flex;
+      gap: 0.5rem;
+      border-top: 1px solid #ddd;
+      position: sticky;
+      bottom: 0;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.1s ease, background 0.2s ease;
+    }
+    button:hover { transform: translateY(-2px); }
+    .btn-primary { background: #3498db; color: #fff; }
+    .btn-danger { background: #e74c3c; color: #fff; }
+    .btn-secondary { background: #2ecc71; color: #fff; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <span id="username"></span> :: <span id="moduleid"></span>
+    </div>
+    <div>
+      <label for="levels">Level:</label>
+      <select id="levels"></select>
+    </div>
+  </header>
+
+  <main>
+    <div class="workspace">
+      <!-- Left side: Editor + Output -->
+      <section id="editorPane">
+        <h2>Editor</h2>
+        <div id="editor"></div>
+        <!--<h3>Exported Script</h3>
+        <pre id="output"></pre>-->
+      </section>
+
+      <!-- Right side: Description + Grid + Log -->
+      <aside id="sidePane">
+        <h2>Description</h2>
+        <div id="desc"></div>
+
+        <h2>Simulation</h2>
+        <div id="grid"></div>
+
+        <h2>Log</h2>
+        <div id="log"></div>
+      </aside>
+    </div>
+  </main>
+
+  <footer>
+    <input id="scriptName" placeholder="Script name" />
+    <select id="scriptList"></select>
+    <button class="btn-primary" onclick="runScript()">▶ Run</button>
+    <button class="btn-secondary" onclick="saveScript()">💾 Save</button>
+    <button class="btn-secondary" onclick="loadScript()">📂 Load</button>
+    <button class="btn-danger" onclick="deleteScript()">🗑 Delete</button>
+  </footer>
+
+  <script type="module">
+    // --- your existing JS logic goes here unchanged ---
+    // (imports, schema-driven editor, renderWorkspace, runScript, save/load/delete, etc.)
+    const queryString = window.location.search;
+    const params = new URLSearchParams(queryString);
+
+    const username = params.get("username");
+    const module = params.get("module");
+
+    const usernameDiv = document.getElementById("username");
+    const moduleidDiv = document.getElementById("moduleid");
+    const levels = document.getElementById("levels");
+    const desc = document.getElementById("desc");
+
+    usernameDiv.textContent = username ?? "Guest";
+    moduleidDiv.textContent = module ?? "Unknown";
+
+    const mjsModule = await import(`./modules/${module}/module.mjs`);
+    let currentLevel = undefined;
+    let root = [];
+    let unit = { x: 0, y: 0, dir: 1 }; // 0=up,1=right,2=down,3=left
+    let state = {};
+
+    globalThis.resetLevel = function resetLevel() {
+        unit = { x: 0, y: 0, dir: 1 }; // 0=up,1=right,2=down,3=left
+        state = {};
+        drawGrid();
+    }
+
+    globalThis.loadLevel = function loadLevel(levelName) {
+      levels.value = levelName;
+      currentLevel = mjsModule.levels[levelName]; // clone later if needed
+      console.log("CURRENT LEVEL", currentLevel);
+      if (!currentLevel) return false;
+      desc.innerHTML = currentLevel.desc;
+      root = [];
+      renderWorkspace(document.getElementById("editor"), root);
+      resetLevel();
+    }
+
+    function populateLevels(obj) {
+      levels.innerHTML = "";
+      levels.onchange = () => loadLevel(levels.value);
+
+      for (const key in obj) {
+        if (currentLevel == undefined) {
+          loadLevel(key);
+        }
+        const o = obj[key];
+        const option = document.createElement("option");
+        option.value = key;
+        option.textContent = o.name;
+        levels.appendChild(option);
+      }
+    }
+
+    addEventListener("load", populateLevels.bind(this, mjsModule.levels));
+
+    function newCommand(type="Say") {
+        const def = currentLevel.schema[type];
+        const cmd = { id: crypto.randomUUID(), command: type, args: {} };
+
+        // Initialize args with defaults
+        for (let arg in def.args) {
+            const argDef = def.args[arg];
+            if (typeof argDef === "object" && "default" in argDef) {
+            cmd.args[arg] = argDef.default;
+            } else {
+            cmd.args[arg] = "";
+            }
+        }
+
+        if (def.subWorkspace) cmd.workspace = [];
+        return cmd;
+    }
+
+    function renderWorkspace(container, workspace) {
+      container.innerHTML = "";
+      workspace.forEach((cmd, idx) => {
+        const def = currentLevel.schema[cmd.command];
+        const div = document.createElement("div");
+        div.className = "command";
+        div.draggable = true;
+
+        // Drag events
+        div.ondragstart = e => { e.dataTransfer.setData("text/plain", idx); };
+        div.ondragover = e => { e.preventDefault(); div.classList.add("drag-over"); };
+        div.ondragleave = () => { div.classList.remove("drag-over"); };
+        div.ondrop = e => {
+          e.preventDefault();
+          div.classList.remove("drag-over");
+          const from = parseInt(e.dataTransfer.getData("text/plain"), 10);
+          const [moved] = workspace.splice(from, 1);
+          workspace.splice(idx, 0, moved);
+          renderWorkspace(container, workspace);
+        };
+
+        // Command selector
+        const select = document.createElement("select");
+        for (let key in currentLevel.schema) {
+          const opt = document.createElement("option");
+          opt.value = key; opt.textContent = key;
+          if (cmd.command === key) opt.selected = true;
+          select.appendChild(opt);
+        }
+        select.onchange = () => {
+          workspace[idx] = newCommand(select.value);
+          renderWorkspace(container, workspace);
+        };
+        div.appendChild(select);
+
+        // Args
+        for (let arg in def.args) {
+            const argDef = def.args[arg];
+            let type = argDef.type || argDef; // fallback for old schema
+            let input;
+
+            if (Array.isArray(type)) {
+                input = document.createElement("select");
+                type.forEach(val => {
+                const opt = document.createElement("option");
+                opt.value = val; opt.textContent = val;
+                if (cmd.args[arg] === val) opt.selected = true;
+                input.appendChild(opt);
+                });
+            } else {
+                input = document.createElement("input");
+                input.type = type === "number" ? "number" : "text";
+                input.value = cmd.args[arg] || "";
+            }
+
+            input.oninput = () => { cmd.args[arg] = input.value; };
+            div.appendChild(document.createTextNode(arg + ": "));
+            div.appendChild(input);
+        }
+
+        // Sub-workspace
+        if (def.subWorkspace) {
+          const details = document.createElement("details");
+          const summary = document.createElement("summary");
+          summary.textContent = "Sub-Workspace";
+          details.appendChild(summary);
+
+          const subDiv = document.createElement("div");
+          subDiv.className = "workspace";
+          renderWorkspace(subDiv, cmd.workspace);
+          details.appendChild(subDiv);
+
+          const addBtn = document.createElement("button");
+          addBtn.className = "btn-secondary";
+          addBtn.textContent = "Add Sub-Command";
+          addBtn.onclick = () => {
+            cmd.workspace.push(newCommand());
+            renderWorkspace(container, workspace);
+          };
+          details.appendChild(addBtn);
+
+          details.open = true;
+          div.appendChild(details);
+        }
+
+        // Remove button
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "btn-danger";
+        removeBtn.textContent = "Remove";
+        removeBtn.onclick = () => {
+          workspace.splice(idx, 1);
+          renderWorkspace(container, workspace);
+        };
+        div.appendChild(removeBtn);
+
+        container.appendChild(div);
+      });
+
+      // Add new command
+      const add = document.createElement("button");
+      add.className = "btn-primary";
+      add.textContent = "Add Command";
+      add.onclick = () => {
+        workspace.push(newCommand());
+        renderWorkspace(container, workspace);
+      };
+      container.appendChild(add);
+    }
+
+    function exportScript() {
+      document.getElementById("output").textContent =
+        JSON.stringify({ script: root }, null, 2);
+    }
+
+    function setGridSize(cols = 10, rows = 10, cellSize = 30) {
+        const grid = document.getElementById("grid");
+        grid.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
+        grid.style.gridTemplateRows = `repeat(${rows}, ${cellSize}px)`;
+    }
+    // Simulation
+    globalThis.drawGrid = function drawGrid() {
+        const grid = document.getElementById("grid");
+        setGridSize(currentLevel.map.width, currentLevel.map.height, 30);
+        grid.innerHTML = "";
+        for (let y=0; y<currentLevel.map.height; y++) {
+            for (let x=0; x<currentLevel.map.width; x++) {
+            const cell = document.createElement("div");
+            cell.title = "Floor";
+            cell.className = "cell";
+            for (const object of currentLevel.map.objects) {
+                if (object.x == x && object.y == y) {
+                    cell.textContent = object.char;
+                    cell.title = object.title;
+                    if (object.bgColor)
+                        cell.style.backgroundColor = object.bgColor;
+                }  
+            }
+            if (x===unit.x && y===unit.y) {
+                cell.classList.add("unit");
+                // Show arrow depending on facing direction
+                let arrow = "↑";
+                if (unit.dir===1) arrow = "→";
+                if (unit.dir===2) arrow = "↓";
+                if (unit.dir===3) arrow = "←";
+                cell.textContent = arrow;
+                cell.title = "You";
+            }
+            grid.appendChild(cell);
+            }
+        }
+    }
+
+    globalThis.log = function log(msg) {
+      const logDiv = document.getElementById("log");
+      const p = document.createElement("div");
+      p.textContent = msg;
+      logDiv.appendChild(p);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    globalThis.sleep = function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    globalThis.runScript = async function runScript() {
+      // reset
+      unit = { x:0, y:0, dir:1 };
+      state = structuredClone(currentLevel.state) || {}; 
+      document.getElementById("log").innerHTML = "";
+      drawGrid();
+
+      globalThis.exec = async function exec(workspace) {
+        for (let cmd of workspace) {
+          const c = currentLevel.schema[cmd.command];
+          if (c && c.action) await c.action.call(currentLevel, cmd, unit, state);
+          await sleep(500);
+        }
+      }
+
+      await exec(root);
+      for (const object of currentLevel.map.objects) {
+         if (object && object.end) {
+            object.end.call(currentLevel, unit, state);
+         }
+      }
+    }
+
+    globalThis.saveScript =  function saveScript() {
+        const name = document.getElementById("scriptName").value.trim();
+        if (!name) { alert("Enter a script name"); return; }
+        localStorage.setItem("botScript_" + name, JSON.stringify(root));
+        refreshScriptList();
+        alert("Saved as " + name);
+    }
+
+    globalThis.loadScript = function loadScript() {
+        const sel = document.getElementById("scriptList");
+        const name = sel.value;
+        if (!name) return;
+        const data = localStorage.getItem("botScript_" + name);
+        if (data) {
+            root = JSON.parse(data);
+            renderWorkspace(document.getElementById("editor"), root);
+        }
+    }
+
+    globalThis.deleteScript = function deleteScript() {
+        const sel = document.getElementById("scriptList");
+        const name = sel.value;
+        if (!name) return;
+        localStorage.removeItem("botScript_" + name);
+        refreshScriptList();
+    }
+
+    globalThis.refreshScriptList = function refreshScriptList() {
+        const sel = document.getElementById("scriptList");
+        sel.innerHTML = "";
+        for (let i=0; i<localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key.startsWith("botScript_")) {
+            const name = key.replace("botScript_","");
+            const opt = document.createElement("option");
+            opt.value = name;
+            opt.textContent = name;
+            sel.appendChild(opt);
+            }
+        }
+    }
+
+    // Call once on page load
+    refreshScriptList();
+  </script>
+</body>
+</html>
