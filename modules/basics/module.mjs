@@ -6,14 +6,14 @@ const schema = {
             "Say": { 
                 args: { text: { type: "string", default: "Hello" } }, 
                 subWorkspace: false,
-                action: (cmd, unit, state) => {
+                action: function (cmd, unit, state) {
                     log("Say: " + (cmd.args.text || ""));
                 }
             },
             "Feel": { 
                 args: { space: { type: ["Empty","Wall","Stairs","Unit"], default: "Empty" } }, 
                 subWorkspace: true,
-                action: (cmd, unit, state) => {
+                action: function (cmd, unit, state) {
                     log("Feel: " + (cmd.args.space || ""));
                     exec.call(this, cmd.workspace);
                 }
@@ -29,13 +29,14 @@ const schema = {
             "Walk": { 
                 args: { steps: { type: "number", default: 1 } }, 
                 subWorkspace: false,
-                action: function (cmd, unit, state) {
+                action: async function (cmd, unit, state) {
                     let steps = parseInt(cmd.args.steps) || 0;
                     for (let i=0; i<steps; i++) {
                         if (unit.dir===0 && unit.y>0) unit.y--;
                         if (unit.dir===1 && unit.x + 1 < this.map.width) unit.x++;
                         if (unit.dir===2 && unit.y + 1 < this.map.height) unit.y++;
                         if (unit.dir===3 && unit.x>0) unit.x--;
+                        sleep(333);
                         drawGrid();
                     }
                     log("Walk " + steps + " step(s)");
