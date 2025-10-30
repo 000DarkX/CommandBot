@@ -41,13 +41,19 @@ const schema = {
                     
                     for (const object of this.map.objects) {
                         if (object.x == startX && object.y == startY && object.attacked) {
+                            if (object.dead) {
+                                break;
+                            }
                             object.attacked.call(this, object, unit, state);
                             gobject = object;
                             break;
                         }
                     }
                     drawGrid();
-                    log(`Attack: ${gobject.name}`);
+                    if (gobject)
+                        log(`Attack: ${gobject.name}, Unit Life: ${gobject.life}`);
+                    else
+                        log(`Attack: -Nothing-`);
                 }
             },
             "Walk": { 
