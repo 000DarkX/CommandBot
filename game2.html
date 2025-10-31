@@ -345,12 +345,17 @@
               clone[o.key] = o.fn;
           }
       }
+
+      currentLevel.loaded = true;
       drawGrid();
     }
 
     function populateLevels(obj) {
       levels.innerHTML = "";
-      levels.onchange = () => loadLevel(levels.value);
+      levels.onchange = () => {
+        resetLevel();
+        loadLevel(levels.value);
+      }
 
       for (const key in obj) {
         if (currentLevel == undefined) {
