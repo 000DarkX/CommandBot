@@ -57,17 +57,18 @@ const schema = {
                 }
             },
             "Walk": { 
-                args: { steps: { type: "number", default: 1 } }, 
+                args: { steps: { type: "number", default: 1 }, dir: {type: ["forward", "backward"], default: "forward"} }, 
                 subWorkspace: false,
                 action: async function (cmd, unit, state) {
                     let steps = parseInt(cmd.args.steps) || 0;
+                    let dir   = (cmd.args.dir || "forward") == "forward" ? 1 : -1 ;
                     for (let i=0; i<steps; i++) {
                         const startX = unit.x;
                         const startY = unit.y;
-                        if (unit.dir===0 && unit.y>0) unit.y--;
-                        if (unit.dir===1 && unit.x + 1 < this.map.width) unit.x++;
-                        if (unit.dir===2 && unit.y + 1 < this.map.height) unit.y++;
-                        if (unit.dir===3 && unit.x>0) unit.x--;
+                        if (unit.dir===0 && unit.y>0) unit.y -= 1 * dir;
+                        if (unit.dir===1 && unit.x + 1 < this.map.width) unit.x += 1 * dir;
+                        if (unit.dir===2 && unit.y + 1 < this.map.height) unit.y += 1 * dir;
+                        if (unit.dir===3 && unit.x>0) unit.x -= 1 * dir;
                         for (const object of this.map.objects) {
                             if (object.dead) continue;
                             if (object.x == unit.x && object.y == unit.y && object.solid) {
@@ -136,7 +137,7 @@ const schema = {
                 args: {}, 
                 subWorkspace: false ,
                 action: function (cmd, unit, state) {
-                    if (unit.life < 20) {
+                    if (unit.life < (unit.maxLife||10)) {
                         unit.life += 1;
                     }
                     log(`Rest: Life ${unit.life}`);
@@ -176,6 +177,42 @@ const enemyA = {
             }
         } else {
             log("Enemy A: Looks around");
+        }
+    }
+};
+
+const enemyB = {
+    title: function (self) {
+        return `${self.name} - Life ${self.life}, Attack ${self.atk}, Range ${self.range}`;
+    },
+    name: "Enemy B",
+    x: 6,
+    y: 0,
+    char: "r",
+    solid: true,
+    life: 2,
+    atk: 1,
+    range: 2,
+    dead: false,
+    attacked: function(self, unit, state) {
+        self.life -= unit.attack;
+        if (self.life <= 0) {
+            self.dead = true;
+        }
+    },
+    tick: function (self, unit, state) {
+        if (self.dead) {
+            return;
+        }
+        const r = Math.hypot(unit.x - self.x, unit.y - self.y);
+        if (r <= self.range) {
+            unit.life -= 1;
+            log(`${self.name}: attacks, Your life: ${unit.life}`);
+            if (unit.life <= 0) {
+                resetLevel();
+            }
+        } else {
+            log(`${self.name}: Looks around`);
         }
     }
 };
@@ -301,6 +338,29 @@ export const levels = {
                     end: function (unit, state) {
                         if (unit.x == 6 && unit.y == 0) {
                             alert("You exited the level!");
+                            loadLevel("level5");
+                        }
+                    }
+                }
+            ]
+        },
+        schema
+    },
+    level5: {
+        name: "Level Five",
+        desc: "Get to the exit!",
+        map: {
+            width: 7,
+            height: 1,
+            objects: [
+                {
+                    title: "exit",
+                    x: 6,
+                    y: 0,
+                    char: "❌",
+                    end: function (unit, state) {
+                        if (unit.x == 6 && unit.y == 0) {
+                            alert("You exited the level!");
                         }
                     }
                 }
@@ -325,10 +385,28 @@ levels.level4.map.objects.push(
     create_enemy({
         x: 3
     }, enemyA)
-)
+);
 
 levels.level4.map.objects.push(
     create_enemy({
         x: 5
     }, enemyA)
-)
+);
+
+levels.level5.map.objects.push(
+    create_enemy({
+        x: 3
+    }, enemyA)
+);
+
+levels.level5.map.objects.push(
+    create_enemy({
+        x: 4
+    }, enemyB)
+);
+
+levels.level5.map.objects.push(
+    create_enemy({
+        x: 5
+    }, enemyA)
+);
