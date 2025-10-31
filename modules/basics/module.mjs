@@ -90,6 +90,17 @@ const schema = {
                     log("Walk " + steps + " step(s)");
                 }
             },
+            "Repeat": { 
+                args: { times: { type: "number", default: 1 } }, 
+                subWorkspace: true,
+                action: async function (cmd, unit, state) {
+                    let steps = parseInt(cmd.args.times) || 0;
+                    for (let i=0; i<steps; i++) {
+                        await exec.call(this, cmd.workspace);
+                    }
+                    log("Repeat " + steps + " times(s)");
+                }
+            },
             "Turn": { 
                 args: { direction: { type: ["left","right"], default: "left" } }, 
                 subWorkspace: false,
@@ -120,8 +131,54 @@ const schema = {
                     // For demo, always execute sub-workspace
                     exec.call(this, cmd.workspace);
                 }
+            },
+            "Rest": { 
+                args: {}, 
+                subWorkspace: false ,
+                action: function (cmd, unit, state) {
+                    if (unit.life < 20) {
+                        unit.life += 1;
+                    }
+                    log(`Rest: Life ${unit.life}`);
+                }
             }
         }
+
+const enemyA = {
+    title: function (self) {
+        return `${self.name} - Life ${self.life}, Attack ${self.atk}, Range ${self.range}`;
+    },
+    name: "Enemy A",
+    x: 6,
+    y: 0,
+    char: "👿",
+    solid: true,
+    life: 2,
+    atk: 1,
+    range: 1,
+    dead: false,
+    attacked: function(self, unit, state) {
+        self.life -= unit.attack;
+        if (self.life <= 0) {
+            self.dead = true;
+        }
+    },
+    tick: function (self, unit, state) {
+        if (self.dead) {
+            return;
+        }
+        const r = Math.hypot(unit.x - self.x, unit.y - self.y);
+        if (r <= 1) {
+            unit.life -= 1;
+            log(`Enemy A: attacks, Your life: ${unit.life}`);
+            if (unit.life <= 0) {
+                resetLevel();
+            }
+        } else {
+            log("Enemy A: Looks around");
+        }
+    }
+};
 
 export const levels = {
     level1: {
@@ -185,6 +242,7 @@ export const levels = {
                     end: function (unit, state) {
                         if (unit.x == 6 && unit.y == 1) {
                             alert("You exited the level!");
+                            loadLevel("level4");
                         }
                     }
                 },
@@ -227,5 +285,50 @@ export const levels = {
             ]
         },
         schema
-    }
+    },
+    level4: {
+        name: "Level Four",
+        desc: "Get to the exit!",
+        map: {
+            width: 7,
+            height: 1,
+            objects: [
+                {
+                    title: "exit",
+                    x: 6,
+                    y: 0,
+                    char: "❌",
+                    end: function (unit, state) {
+                        if (unit.x == 6 && unit.y == 0) {
+                            alert("You exited the level!");
+                        }
+                    }
+                }
+            ]
+        },
+        schema
+    },
 }
+
+function create_enemy(params, enemy) {
+    const e = {};
+    for (const key in enemy) {
+        const v = enemy[key];
+        if (typeof v == "function") e[key] = v;
+        else e[key] = structuredClone(v);
+    }
+    Object.assign(e, params);
+    return e;
+}
+
+levels.level4.map.objects.push(
+    create_enemy({
+        x: 3
+    }, enemyA)
+)
+
+levels.level4.map.objects.push(
+    create_enemy({
+        x: 5
+    }, enemyA)
+)
