@@ -280,7 +280,7 @@
     const mjsModule = await import(`./modules/${module}/module.mjs`);
     let currentLevel = undefined;
     let root    = [];
-    let defaultUnit = {life: 20, attack: 1, x: 0, y: 0, dir: 1};
+    let defaultUnit = {life: 10, attack: 1, x: 0, y: 0, dir: 1};
     let unit    = { x: 0, y: 0, dir: 1 }; // 0=up,1=right,2=down,3=left
     let state   = {};
     let objects = undefined;
@@ -663,4 +663,5 @@
     })();
   </script>
 </body>
+
 </html>
